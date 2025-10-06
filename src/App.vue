@@ -3,7 +3,7 @@
     <div class="max-w-6xl mx-auto">
       <header class="text-center mb-8 pt-8">
         <h1 class="text-4xl font-bold text-gray-800 mb-2">QR Code Generator</h1>
-        <p class="text-gray-600">Create customizable QR codes with logo overlay</p>
+        <p class="text-gray-600">Create branded QR codes with automatic company logo</p>
       </header>
       
       <div class="grid lg:grid-cols-2 gap-6">
@@ -28,46 +28,21 @@
             </p>
           </div>
 
-          <!-- Logo Upload Section -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-              Logo Image (Optional)
-            </label>
-            <div class="space-y-3">
-              <input
-                type="file"
-                ref="logoInput"
-                @change="handleLogoUpload"
-                accept="image/*"
-                class="hidden"
-              />
-              <div class="flex gap-2">
-                <button
-                  @click="$refs.logoInput.click()"
-                  class="flex-1 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold rounded-lg transition"
-                >
-                  {{ logoImage ? 'Change Logo' : 'Upload Logo' }}
-                </button>
-                <button
-                  v-if="logoImage"
-                  @click="removeLogo"
-                  class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg transition"
-                >
-                  Remove
-                </button>
-              </div>
-              <div v-if="logoImage" class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <img :src="logoImage" alt="Logo preview" class="w-12 h-12 object-contain" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm text-gray-700 truncate">{{ logoFileName }}</p>
-                  <p class="text-xs text-gray-500">Logo will be centered on QR code</p>
-                </div>
+          <!-- Logo Info -->
+          <div class="p-4 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <div class="flex-1">
+                <p class="text-sm font-semibold text-indigo-900">Company logo automatically applied</p>
+                <p class="text-xs text-indigo-700 mt-1">All QR codes include your branding at the center</p>
               </div>
             </div>
           </div>
 
           <!-- Logo Size Control -->
-          <div v-if="logoImage">
+          <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2" for="logo-size">
               Logo Size: {{ logoSize }}%
             </label>
@@ -177,7 +152,7 @@
                 <option value="Q">Quartile (25%)</option>
                 <option value="H">High (30%)</option>
               </select>
-              <p class="text-xs text-gray-500 mt-1" v-if="logoImage">Use High for logos</p>
+              <p class="text-xs text-gray-500 mt-1">High recommended for logo overlay</p>
             </div>
             
             <div>
@@ -290,7 +265,6 @@
                   </p>
                   <p class="text-xs text-gray-500">
                     {{ formatDate(item.timestamp) }}
-                    <span v-if="item.hasLogo" class="text-indigo-600"> • With Logo</span>
                   </p>
                   <div class="flex gap-2 mt-2">
                     <button
@@ -312,16 +286,14 @@
           </div>
         </div>
       </div>
-      
-      <footer class="text-center mt-12 pb-8 text-gray-500 text-sm">
-        <p>Built with Vue.js & qrcode.js • Production-ready QR Generator with Logo Overlay</p>
-      </footer>
     </div>
   </div>
 </template>
 
 <script>
 import QRCode from 'qrcode';
+// Import the company logo from assets
+import CompanyLogo from '@/assets/Logo.png';
 
 export default {
   name: 'App',
@@ -335,8 +307,7 @@ export default {
       errorLevel: 'H',
       format: 'png',
       qrDataUrl: '',
-      logoImage: null,
-      logoFileName: '',
+      companyLogoSrc: CompanyLogo, // Automatically loaded company logo
       logoSize: 18,
       history: [],
       maxHistory: 10,
@@ -371,39 +342,6 @@ export default {
   },
   
   methods: {
-    handleLogoUpload(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      if (!file.type.startsWith('image/')) {
-        this.error = 'Please upload a valid image file';
-        return;
-      }
-      
-      this.logoFileName = file.name;
-      const reader = new FileReader();
-      
-      reader.onload = (event) => {
-        this.logoImage = event.target.result;
-        this.generateQR();
-      };
-      
-      reader.onerror = () => {
-        this.error = 'Failed to read image file';
-      };
-      
-      reader.readAsDataURL(file);
-    },
-    
-    removeLogo() {
-      this.logoImage = null;
-      this.logoFileName = '';
-      if (this.$refs.logoInput) {
-        this.$refs.logoInput.value = '';
-      }
-      this.generateQR();
-    },
-    
     async generateQR() {
       if (!this.isValidInput) {
         this.error = 'Please enter text or URL';
@@ -428,10 +366,8 @@ export default {
         const canvas = document.createElement('canvas');
         await QRCode.toCanvas(canvas, this.inputText, opts);
         
-        // If logo exists, overlay it on the canvas
-        if (this.logoImage) {
-          await this.overlayLogo(canvas);
-        }
+        // Automatically overlay company logo on every QR code
+        await this.overlayCompanyLogo(canvas);
         
         // Convert canvas to data URL
         this.qrDataUrl = canvas.toDataURL('image/png');
@@ -454,7 +390,7 @@ export default {
       }
     },
     
-    async overlayLogo(canvas) {
+    async overlayCompanyLogo(canvas) {
       return new Promise((resolve, reject) => {
         const ctx = canvas.getContext('2d');
         const img = new Image();
@@ -488,16 +424,17 @@ export default {
             logoHeight + padding * 2
           );
           
-          // Draw logo
+          // Draw company logo
           ctx.drawImage(img, x, y, logoWidth, logoHeight);
           resolve();
         };
         
         img.onerror = () => {
-          reject(new Error('Failed to load logo image'));
+          reject(new Error('Failed to load company logo. Please check if Logo.png exists in src/assets/'));
         };
         
-        img.src = this.logoImage;
+        // Load company logo automatically
+        img.src = this.companyLogoSrc;
       });
     },
     
@@ -512,10 +449,7 @@ export default {
         errorLevel: this.errorLevel,
         format: this.format,
         dataUrl: this.qrDataUrl,
-        hasLogo: !!this.logoImage,
-        logoImage: this.logoImage,
         logoSize: this.logoSize,
-        logoFileName: this.logoFileName,
         timestamp: new Date().toISOString()
       };
       
@@ -558,9 +492,7 @@ export default {
       this.errorLevel = entry.errorLevel;
       this.format = entry.format;
       this.qrDataUrl = entry.dataUrl;
-      this.logoImage = entry.logoImage || null;
       this.logoSize = entry.logoSize || 18;
-      this.logoFileName = entry.logoFileName || '';
       
       // Update canvas display
       this.$nextTick(() => {
@@ -593,7 +525,7 @@ export default {
       if (!this.qrDataUrl) return;
       
       const link = document.createElement('a');
-      const fileName = `qrcode-${Date.now()}.${this.format}`;
+      const fileName = `qrcode-branded-${Date.now()}.${this.format}`;
       link.href = this.qrDataUrl;
       link.download = fileName;
       link.click();
